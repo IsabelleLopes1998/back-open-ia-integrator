@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const healthRoutes = require('./routes/healthRoutes.js');
 const userRoutes = require('./routes/userRoutes.js');
+const imageRoutes = require('./routes/imageRoutes.js');
 const cors = require('cors');
 
 const app = express();
@@ -25,8 +26,9 @@ app.use(
 );
 
 // Middlewares
-
 app.use(express.json());
+// Servir arquivos estáticos da pasta uploads
+app.use('/uploads', express.static('uploads'));
 
 // Rotas
 // Health
@@ -35,10 +37,11 @@ app.use('/health', healthRoutes);
 // Registration
 // Perfil
 app.use('/api/user', userRoutes);
+// AI - Geração de Imagens
+app.use('/api/image', imageRoutes);
 // Client
 // Session
 // Agenda
 // Dashboard
-// AI
 
 module.exports = app;

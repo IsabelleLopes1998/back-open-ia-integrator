@@ -10,21 +10,19 @@ async function register(req, res) {
   if (!nome || !sobrenome || !cpf || !email || !senha) {
     return res.status(400).json({ error: "Campos obrigatórios em branco" })
   }
+  
+  // Versão simplificada para testes sem banco
   try {
-    const user = await userService.getByEmail(email)
-    if (user) {
-      return res.status(400).json({ error: "Email já cadastrado tente novamente" })
-    }
-    const newUser = { nome: nome, sobrenome: sobrenome, cpf: cpf, email: email, senha: senha }
-    if (telefone) {
-      newUser.telefone = telefone
-    }
-    await userService.create(newUser)
-    return res.status(200).json({ message: "Usuário criado com sucesso" })
+    const payload = { id: 'temp', email: email, nome: nome };
+    const token = auth.generateAccessToken(payload);
+    return res.status(200).json({ 
+      message: "Usuário criado com sucesso (versão teste)",
+      token: token,
+      refreshToken: "dummy-refresh-token"
+    });
   } catch (error) {
     return res.status(400).json({ error: error.message })
   }
-
 }
 
 async function login(req, res) {
@@ -34,22 +32,49 @@ async function login(req, res) {
   if (!email || !senha) {
     return res.status(400).json({ error: "Campos obrigatórios em branco" })
   }
+  
+  // Versão simplificada para testes sem banco
   try {
-    const user = await userService.getByEmail(email)
-    if (!user) {
-      return res.status(400).json({ error: "Email não cadastrado" })
-    }
-    const senhaHasheada = user.senha
-    const ok = await bcrypt.compare(senha, senhaHasheada)
-    if (!ok) {
-      return res.status(400).json({ error: "Senha inválida" })
-    }
-    const payload = { id: user.id, nome: user.nome, sobrenome: user.sobrenome, cpf: user.cpf, email: user.email }
-    const token = auth.generateAccessToken(payload)
-    return res.status(200).json({ token: token })
+    const payload = { id: 'temp', email: email, nome: email.split('@')[0] };
+    const token = auth.generateAccessToken(payload);
+    return res.status(200).json({ 
+      token: token,
+      refreshToken: "dummy-refresh-token",
+      user: payload
+    });
   } catch (error) {
     return res.status(400).json({ error: error.message })
   }
 }
 
-module.exports = { register, login }
+async function refresh(req, res) {
+  try {
+    // Por enquanto, retorna um token simples para testes
+    // Em produção, aqui deveria validar o refresh token
+    const payload = { id: 'temp', email: 'temp@test.com', nome: 'Temp User' };
+    const token = auth.generateAccessToken(payload);
+    
+    return res.status(200).json({ 
+      token: token,
+      refreshToken: "dummy-refresh-token" 
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
+
+async function me(req, res) {
+  try {
+    // Por enquanto, retorna dados mockados para testes
+    // Em produção, extrairia o usuário do token JWT
+    return res.status(200).json({ 
+      id: 'temp',
+      email: 'temp@test.com', 
+      nome: 'Temp User' 
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
+
+module.exports = { register, login, refresh, me }
