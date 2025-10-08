@@ -11,4 +11,10 @@ router.post('/generate-file', imageController.generateImageWithFile);
 // Rota específica para gerar imagem e retornar base64
 router.post('/generate-base64', imageController.generateImageBase64);
 
+// Rota específica para gerar imagem e retornar URL
+router.post('/generate-url', imageController.generateImageWithUrl);
+
+// Rota para proxy de download (contorna CORS)
+router.post('/download-proxy', imageController.downloadImageProxy);
+
 module.exports = router;
