@@ -117,7 +117,7 @@ async function generateImageBase64(req, res) {
 
 async function generateImageWithUrl(req, res) {
   try {
-    const { prompt, model, size, quality, style } = req.body;
+    const { prompt, model, size, quality, style, store } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ 
@@ -142,9 +142,38 @@ async function generateImageWithUrl(req, res) {
     const imagePromise = imageService.generateImageWithUrl(prompt, options);
     
     const image = await Promise.race([imagePromise, timeoutPromise]);
-    
+
     if (image.success) {
       console.log('✅ Imagem gerada com URL com sucesso');
+
+      // Caso solicitado, armazena temporariamente no Supabase e retorna URL assinada
+      if (store) {
+        try {
+          const apiRes = image.toAPIResponse();
+          const originalUrl = apiRes?.data?.url || apiRes?.url;
+          const stored = await imageService.storeOpenAIUrlToSupabase({ imageUrl: originalUrl, prompt });
+          if (stored.success) {
+            return res.status(200).json({
+              ...apiRes,
+              stored: {
+                provider: 'supabase',
+                url: stored.url,
+                path: stored.path,
+                contentType: stored.contentType,
+                size: stored.size,
+                expiresInSeconds: 3600
+              }
+            });
+          } else {
+            console.warn('⚠️ Falha ao salvar no Supabase:', stored.error);
+            return res.status(200).json(apiRes);
+          }
+        } catch (storeErr) {
+          console.warn('⚠️ Erro ao processar armazenamento no Supabase:', storeErr.message);
+          return res.status(200).json(image.toAPIResponse());
+        }
+      }
+
       return res.status(200).json(image.toAPIResponse());
     } else {
       console.log('❌ Erro ao gerar imagem com URL:', image.error);
