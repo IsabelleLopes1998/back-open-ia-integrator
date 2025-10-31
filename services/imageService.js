@@ -1,6 +1,4 @@
 const OpenAI = require('openai');
-const { writeFile } = require('fs/promises');
-const path = require('path');
 const Image = require('../models/image');
 const supabaseService = require('./supabaseService');
 
@@ -67,54 +65,7 @@ class ImageService {
     }
   }
 
-  async generateAndSaveImage(prompt, filename, options = {}) {
-    try {
-      const image = await this.generateImage(prompt, options);
-      
-      if (!image.success) {
-        return image;
-      }
-
-      if (image.base64) {
-        const imageBuffer = Buffer.from(image.base64, "base64");
-        const filePath = path.join(process.cwd(), 'uploads', filename);
-        
-        // Criar diretório uploads se não existir
-        const fs = require('fs');
-        const uploadsDir = path.join(process.cwd(), 'uploads');
-        if (!fs.existsSync(uploadsDir)) {
-          fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-        
-        await writeFile(filePath, imageBuffer);
-        
-        return Image.fromSavedFile(
-          { 
-            created: image.created,
-            data: [{ b64_json: image.base64 }],
-            usage: image.usage
-          }, 
-          prompt, 
-          filename, 
-          filePath, 
-          options
-        );
-      } else {
-        return Image.createError(prompt, 'Resposta inválida da API OpenAI', options);
-      }
-    } catch (error) {
-      return Image.createError(prompt, `Erro ao salvar imagem: ${error.message}`, options);
-    }
-  }
-
-  async generateImageBase64(prompt, options = {}) {
-    try {
-      const image = await this.generateImage(prompt, options);
-      return image;
-    } catch (error) {
-      return Image.createError(prompt, `Erro ao gerar imagem base64: ${error.message}`, options);
-    }
-  }
+  // Base64 e gravação em arquivo foram removidos; usamos apenas URL
 
   async generateImageWithUrl(prompt, options = {}) {
     try {
