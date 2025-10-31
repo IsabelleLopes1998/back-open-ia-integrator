@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const { writeFile } = require('fs/promises');
 const path = require('path');
 const Image = require('../models/image');
+const supabaseService = require('./supabaseService');
 
 class ImageService {
   constructor() {
@@ -166,6 +167,49 @@ class ImageService {
         error: error.message
       };
     }
+  }
+
+  async storeOpenAIUrlToSupabase({ imageUrl, prompt }) {
+    if (!supabaseService.isEnabled()) {
+      return { success: false, error: 'Supabase não configurado' };
+    }
+
+    const download = await this.downloadImageFromUrl(imageUrl);
+    if (!download.success) {
+      return { success: false, error: download.error };
+    }
+
+    const safePrompt = (prompt || 'image')
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60);
+    const timestamp = Date.now();
+    const ext = download.contentType.includes('png') ? 'png' : download.contentType.includes('jpeg') ? 'jpg' : 'bin';
+    const objectPath = `openai/${safePrompt}-${timestamp}.${ext}`;
+
+    const uploaded = await supabaseService.uploadBuffer({
+      buffer: download.buffer,
+      contentType: download.contentType,
+      objectPath
+    });
+
+    if (!uploaded.success) {
+      return { success: false, error: uploaded.error };
+    }
+
+    const signed = await supabaseService.createSignedUrl({ objectPath, expiresInSeconds: 60 * 60 });
+    if (!signed.success) {
+      return { success: false, error: signed.error };
+    }
+
+    return {
+      success: true,
+      url: signed.url,
+      path: objectPath,
+      contentType: download.contentType,
+      size: download.size
+    };
   }
 }
 

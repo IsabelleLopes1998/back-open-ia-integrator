@@ -22,6 +22,31 @@
 5. Em caso de `saveToFile`, o serviço grava o arquivo em `uploads/` e devolve metadados.
 6. Controllers retornam sempre `image.toAPIResponse()`, mantendo o contrato consistente.
 
+## Diagrama de fluxo
+```mermaid
+flowchart TD
+    A[Cliente HTTP] --> B[/routes/imageRoutes.js/]
+    B --> C[controllers/imageController.js]
+    C -->|Validação + defaults| D[services/imageService.js]
+    D -->|Promise.race 30s| E[(OpenAI Images API)]
+    E -->|Sucesso (URL/base64)| F[models/image.js (Image.fromOpenAIResponse)]
+    D -->|Erro ou timeout| G[Fallback placeholder<br/>Image.createError]
+    D -->|saveToFile?| H[(uploads/ no filesystem)]
+    H --> I[Image.fromSavedFile]
+    F --> J{Destino}
+    I --> J
+    G --> J
+    J --> K[Controller empacota via toAPIResponse]
+    K --> L[JSON 200/500 para o cliente]
+```
+
+## Papel da controller
+- **Validação**: garante que `prompt` esteja presente e organiza parâmetros opcionais (`model`, `size`, `quality`, `style`) com defaults.
+- **Orquestração**: decide qual método do `ImageService` usar (gerar, salvar, retornar URL/base64) conforme o endpoint chamado.
+- **Timeout adicional**: envolve a chamada do serviço em um `Promise.race` de 30 s para evitar requisições penduradas mesmo que o serviço demore.
+- **Padronização da resposta**: converte o retorno em `image.toAPIResponse()`, define o status HTTP correto e mantém logs.
+- **Tratamento de erro**: captura exceções inesperadas, registra contexto e devolve `Image.createError` para preservar o formato padrão do contrato.
+
 ## Decisões principais e motivação
 - **CommonJS e classe de serviço**: o código original em ESM foi convertido para CommonJS para alinhar com o restante do backend. A classe `ImageService` permite compartilhar o mesmo cliente configurado com `process.env.OPENAI_API_KEY`.
 - **`response_format: "url"`**: optamos por abandonar `b64_json` porque as respostas em base64 chegavam lentas e pesadas. Usar URLs hospedadas pela OpenAI acelera a entrega; quando necessário, utilizamos `downloadImageFromUrl` para atuar como proxy e driblar CORS/expiração.
@@ -39,8 +64,9 @@
 
 ## Considerações sobre URLs temporárias
 - As URLs devolvidas pela OpenAI expiram; por isso fornecemos o proxy (`downloadImageFromUrl`) para servir o arquivo através do backend.
-- O proxy define headers (`Content-Type`, `Content-Length`, `Content-Disposition`) e retorna o `Buffer` ao cliente.
+- O proxy baixa o arquivo dentro do servidor (`fetch` → `arrayBuffer` → `Buffer`), insere headers (`Content-Type`, `Content-Length`, `Content-Disposition`) e só então devolve o conteúdo. Assim evitamos expor a URL temporária diretamente, contornamos CORS e garantimos que o backend registre logs e auditoria.
 - Caso a URL remota falhe, o serviço devolve mensagem clara (`Erro ao baixar imagem: ...`).
+- O `Buffer` Node.js representa o conteúdo binário da imagem em memória; ele permite tanto enviar o arquivo na resposta HTTP (`res.send(Buffer)`) quanto persistir em disco via `writeFile`, preservando bytes sem conversões para string.
 
 ## Possíveis extensões
 - Persistir metadados de geração no banco usando o modelo `Image`.
