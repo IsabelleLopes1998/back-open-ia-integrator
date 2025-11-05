@@ -1,6 +1,4 @@
 const OpenAI = require('openai');
-const { writeFile } = require('fs/promises');
-const path = require('path');
 const Image = require('../models/image');
 const supabaseService = require('./supabaseService');
 
@@ -9,111 +7,6 @@ class ImageService {
     this.client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY
     });
-  }
-
-  async generateImage(prompt, options = {}) {
-    try {
-      console.log('🔄 Gerando imagem com prompt:', prompt);
-      
-      const {
-        model = "dall-e-3",
-        n = 1,
-        size = "1024x1024",
-        quality = "standard",
-        style = "vivid"
-      } = options;
-
-      // Adiciona timeout para evitar travamento
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout: OpenAI API demorou muito para responder')), 30000);
-      });
-
-      const apiPromise = this.client.images.generate({
-        model,
-        prompt,
-        n,
-        size,
-        quality,
-        style,
-        response_format: "url" // Mudança para URL para evitar problemas com base64
-      });
-
-      const response = await Promise.race([apiPromise, timeoutPromise]);
-      console.log('✅ Imagem gerada com sucesso');
-      
-      return Image.fromOpenAIResponse(response, prompt, options);
-    } catch (error) {
-      console.error('❌ Erro ao gerar imagem:', error);
-      
-      // Se der timeout ou erro da API, retorna imagem mockada como fallback
-      if (error.message.includes('Timeout') || error.message.includes('API')) {
-        console.log('⚠️  Usando imagem mockada como fallback');
-        const mockResponse = {
-          data: [{
-            url: 'https://via.placeholder.com/1024x1024/FF0000/FFFFFF?text=Fallback+Image',
-            b64_json: null
-          }],
-          created: Math.floor(Date.now() / 1000),
-          usage: {
-            prompt_tokens: 10,
-            completion_tokens: 0,
-            total_tokens: 10
-          }
-        };
-        return Image.fromOpenAIResponse(mockResponse, prompt, options);
-      }
-      
-      return Image.createError(prompt, `Erro ao gerar imagem: ${error.message}`, options);
-    }
-  }
-
-  async generateAndSaveImage(prompt, filename, options = {}) {
-    try {
-      const image = await this.generateImage(prompt, options);
-      
-      if (!image.success) {
-        return image;
-      }
-
-      if (image.base64) {
-        const imageBuffer = Buffer.from(image.base64, "base64");
-        const filePath = path.join(process.cwd(), 'uploads', filename);
-        
-        // Criar diretório uploads se não existir
-        const fs = require('fs');
-        const uploadsDir = path.join(process.cwd(), 'uploads');
-        if (!fs.existsSync(uploadsDir)) {
-          fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-        
-        await writeFile(filePath, imageBuffer);
-        
-        return Image.fromSavedFile(
-          { 
-            created: image.created,
-            data: [{ b64_json: image.base64 }],
-            usage: image.usage
-          }, 
-          prompt, 
-          filename, 
-          filePath, 
-          options
-        );
-      } else {
-        return Image.createError(prompt, 'Resposta inválida da API OpenAI', options);
-      }
-    } catch (error) {
-      return Image.createError(prompt, `Erro ao salvar imagem: ${error.message}`, options);
-    }
-  }
-
-  async generateImageBase64(prompt, options = {}) {
-    try {
-      const image = await this.generateImage(prompt, options);
-      return image;
-    } catch (error) {
-      return Image.createError(prompt, `Erro ao gerar imagem base64: ${error.message}`, options);
-    }
   }
 
   async generateImageWithUrl(prompt, options = {}) {
