@@ -80,7 +80,8 @@ class ImageService {
     const timestamp = Date.now();
     const ext = download.contentType.includes('png') ? 'png' : download.contentType.includes('jpeg') ? 'jpg' : 'bin';
     const objectPath = `openai/${safePrompt}-${timestamp}.${ext}`;
-
+    
+    //Feito o envio para o Bucket
     const uploaded = await supabaseService.uploadBuffer({
       buffer: download.buffer,
       contentType: download.contentType,

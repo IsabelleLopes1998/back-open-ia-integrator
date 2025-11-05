@@ -61,7 +61,7 @@ class SupabaseService {
     if (!this.isEnabled()) {
       return { success: false, error: 'Supabase não configurado' };
     }
-
+    // criação da URL assinada para o objeto
     const { data, error } = await this.client.storage
       .from(this.bucketName)
       .createSignedUrl(objectPath, expiresInSeconds);

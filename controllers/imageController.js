@@ -38,7 +38,11 @@ async function generateImageWithUrl(req, res) {
           const apiRes = image.toAPIResponse();
           const originalUrl = apiRes?.data?.url || apiRes?.url;
           const stored = await imageService.storeOpenAIUrlToSupabase({ imageUrl: originalUrl, prompt });
+          
+          // após fazer o upload no bucket, a função storeOpenAIUrlToSupabase retorna o URL assinado
+          // o URL assinado é o que será retornado para o cliente
           if (stored.success) {
+            // retorno da resposta para o cliente
             return res.status(200).json({
               ...apiRes,
               stored: {
